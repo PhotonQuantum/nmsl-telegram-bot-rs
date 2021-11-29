@@ -1,0 +1,7 @@
+version: "3"
+services:
+  nmsl:
+    build: .
+    environment:
+      - TELOXIDE_TOKEN=<your token here>
+    restart: always
