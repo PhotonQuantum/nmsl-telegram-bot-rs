@@ -1,5 +1,6 @@
-use nmsl_core::SunBible;
 use std::io::Cursor;
+
+use nmsl_core::SunBible;
 
 static BIBLE: &[u8] = include_bytes!("../bible.json");
 
