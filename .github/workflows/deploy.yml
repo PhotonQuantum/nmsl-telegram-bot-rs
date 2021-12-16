@@ -1,0 +1,35 @@
+on:
+  workflow_run:
+    workflows: [ "Test" ]
+    types: [ completed ]
+
+name: Deploy
+
+jobs:
+  musl:
+    name: Deploy Binary (musl)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.ref == 'refs/heads/master' }}
+    steps:
+      - uses: actions/checkout@v2
+        name: Checkout 🛎️
+      - uses: actions-rs/toolchain@v1
+        name: Setup Cargo Toolchain 🛎️
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+          default: true
+      - run: sudo apt-get install -y musl-tools
+        name: Setup musl 🔧
+      - uses: Swatinem/rust-cache@v1
+      - run: cargo build --release --target x86_64-unknown-linux-musl
+        name: Build Release Binary 🚀
+      - run: cp target/x86_64-unknown-linux-musl/release/nmsl-telegram-bot ./
+      - uses: actions/upload-artifact@v2
+        name: Upload Artifact
+        with:
+          name: release-musl
+          path: |
+            nmsl-telegram-bot
+            bible.json
