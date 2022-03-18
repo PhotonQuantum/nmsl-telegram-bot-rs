@@ -36,6 +36,7 @@ impl FromStr for PinyinSeq {
 }
 
 impl SunBible {
+    #[must_use]
     pub fn new(dict: IndexMap<String, String>) -> Self {
         info!("Loading jieba dict...");
         let mut jieba = Jieba::new();
@@ -81,6 +82,7 @@ impl SunBible {
                 })
         })
     }
+    #[must_use]
     pub fn convert(&self, sentence: &str) -> String {
         self.jieba
             .cut(sentence, true)

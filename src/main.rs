@@ -3,19 +3,36 @@ use std::sync::Arc;
 
 use log::{error, info};
 use teloxide::adaptors::AutoSend;
-use teloxide::dispatching::{Dispatcher, DispatcherHandlerRx};
+use teloxide::dispatching2::{Dispatcher, UpdateFilterExt};
 use teloxide::error_handlers::LoggingErrorHandler;
-use teloxide::prelude::StreamExt;
 use teloxide::requests::{Requester, RequesterExt};
 use teloxide::types::{
     InlineQuery, InlineQueryResult, InlineQueryResultArticle, InputMessageContent,
-    InputMessageContentText,
+    InputMessageContentText, Update,
 };
-use teloxide::Bot;
+use teloxide::{dptree, Bot};
 use teloxide_listener::Listener;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use nmsl_core::SunBible;
+
+async fn handler(query: InlineQuery, bot: AutoSend<Bot>, bible: Arc<SunBible>) -> Result<(), ()> {
+    let resp = if query.query.is_empty() {
+        String::from("NMSL")
+    } else {
+        bible.convert(query.query.as_str())
+    };
+    let hash = format!("{:x}", md5::compute(&resp));
+    let result = [InlineQueryResult::Article(InlineQueryResultArticle::new(
+        hash,
+        resp.clone(),
+        InputMessageContent::Text(InputMessageContentText::new(resp)),
+    ))];
+    let resp = bot.answer_inline_query(&query.id, result).await;
+    if let Err(e) = resp {
+        error!("Unable to send answer: {}", e);
+    }
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() {
@@ -27,39 +44,18 @@ async fn main() {
             .expect("load bible"),
     );
 
-    let dispatcher = Dispatcher::new(bot.clone()).inline_queries_handler(
-        move |rx: DispatcherHandlerRx<AutoSend<Bot>, InlineQuery>| {
-            UnboundedReceiverStream::new(rx).for_each_concurrent(None, move |query| {
-                let resp = if query.update.query.is_empty() {
-                    String::from("NMSL")
-                } else {
-                    bible.convert(query.update.query.as_str())
-                };
-                let hash = format!("{:x}", md5::compute(&resp));
-                let result = [InlineQueryResult::Article(InlineQueryResultArticle::new(
-                    hash,
-                    resp.clone(),
-                    InputMessageContent::Text(InputMessageContentText::new(resp)),
-                ))];
-                async move {
-                    let resp = query
-                        .requester
-                        .answer_inline_query(&query.update.id, result)
-                        .await;
-                    if let Err(e) = resp {
-                        error!("Unable to send answer: {}", e);
-                    }
-                }
-            })
-        },
-    );
-
     info!("Starting bot...");
-    dispatcher
-        .setup_ctrlc_handler()
-        .dispatch_with_listener(
-            Listener::from_env().build(bot).await,
-            LoggingErrorHandler::with_custom_text("An error from the update listener"),
-        )
-        .await;
+    let listener = Listener::from_env().build(bot.clone()).await;
+    Dispatcher::builder(
+        bot,
+        dptree::entry().branch(Update::filter_inline_query().endpoint(handler)),
+    )
+    .dependencies(dptree::deps![bible])
+    .build()
+    .setup_ctrlc_handler()
+    .dispatch_with_listener(
+        listener,
+        LoggingErrorHandler::with_custom_text("An error from the update listener"),
+    )
+    .await;
 }
