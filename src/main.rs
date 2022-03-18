@@ -45,7 +45,9 @@ async fn main() {
     );
 
     info!("Starting bot...");
-    let listener = Listener::from_env().build(bot.clone()).await;
+    let listener = Listener::from_env_with_prefix("APP_")
+        .build(bot.clone())
+        .await;
     Dispatcher::builder(
         bot,
         dptree::entry().branch(Update::filter_inline_query().endpoint(handler)),
