@@ -12,7 +12,7 @@ name = "nmsl_core"
 path = "./src/lib.rs"
 
 [dependencies]
-indexmap = { version = "1.8", features = ["serde-1"] }
+indexmap = { version = "1.9", features = ["serde-1"] }
 itertools = "0.10"
 jieba-rs = "0.6"
 log = "0.4"
